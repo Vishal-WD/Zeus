@@ -56,6 +56,7 @@ import {
 } from '../services/gemini';
 import { fetchStreetRoute } from '../services/osrmRouting';
 import { calculateTomTomRoute, TOMTOM_CONFIG, ALL_INDIA_NATIONAL_HUBS } from '../services/tomtomService';
+import { resolveUserLocation } from '../services/locationService';
 import {
   predictBatteryStrandingRisk,
   predictQueueRisk,
@@ -241,13 +242,18 @@ export default function DriverMobile() {
   const [locationBannerDismissed, setLocationBannerDismissed] = useState<boolean>(false);
   const [gpsAccuracyMeters, setGpsAccuracyMeters] = useState<number | null>(null);
 
-  // Device GPS Geolocation
+  // Device GPS Geolocation with Automatic IP Fallback
   const requestUserLocation = useCallback(() => {
+    setIsLocating(true);
     if (!navigator.geolocation) {
-      setGeoUnsupported(true);
+      resolveUserLocation().then((loc) => {
+        setDriverLocation(loc.coords);
+        setGpsAccuracyMeters(loc.accuracyMeters || 100);
+        setHasLocationPermission(true);
+        setIsLocating(false);
+      });
       return;
     }
-    setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const acc = Math.round(pos.coords.accuracy || 10);
@@ -282,11 +288,15 @@ export default function DriverMobile() {
         });
       },
       (err) => {
-        console.warn('Live geolocation notice:', err);
-        setHasLocationPermission(false);
-        setIsLocating(false);
+        console.warn('Live geolocation notice, using IP fallback:', err);
+        resolveUserLocation().then((loc) => {
+          setDriverLocation(loc.coords);
+          setGpsAccuracyMeters(loc.accuracyMeters || 100);
+          setHasLocationPermission(true);
+          setIsLocating(false);
+        });
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
     );
   }, []);
 
