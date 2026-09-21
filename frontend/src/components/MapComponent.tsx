@@ -2,7 +2,13 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Station } from '../types/zeus';
-import { resolveUserLocation, UserLocationResult } from '../services/locationService';
+import {
+  resolveUserLocation,
+  requestExactGpsLocation,
+  setUserManualLocation,
+  POPULAR_MUNICIPAL_HUBS,
+  UserLocationResult,
+} from '../services/locationService';
 import { scrapeLiveTomTomEVStations } from '../services/tomtomService';
 
 interface MapComponentProps {
@@ -40,21 +46,22 @@ export default function MapComponent({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
-  const routeLayerAdded = useRef<boolean>(false);
 
   const [userLocation, setUserLocation] = useState<UserLocationResult | null>(null);
   const [activeRadius, setActiveRadius] = useState<ProximityRadius>('25');
   const [nearbyStations, setNearbyStations] = useState<Station[]>(initialStations);
   const [hoveredStation, setHoveredStation] = useState<(Station & { distanceKm?: number }) | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
-  const [isInitialLocationFitDone, setIsInitialLocationFitDone] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isGpsLoading, setIsGpsLoading] = useState(false);
+  const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // 1. Resolve User Live Location on Mount & Scrape Live Nearby Hubs
+  // 1. Resolve User Live Location on Mount
   useEffect(() => {
     resolveUserLocation().then(async (loc) => {
       setUserLocation(loc);
 
-      // Scrape live TomTom charging stations directly around user's live position
       try {
         const liveScraped = await scrapeLiveTomTomEVStations(loc.coords, 35000);
         if (liveScraped && liveScraped.length > 0) {
@@ -70,7 +77,6 @@ export default function MapComponent({
   useEffect(() => {
     if (initialStations && initialStations.length > 0) {
       setNearbyStations((prev) => {
-        // Merge without losing live scraped items
         const map = new Map();
         initialStations.forEach((s) => map.set(s.id, s));
         prev.forEach((s) => {
@@ -97,7 +103,6 @@ export default function MapComponent({
 
     const withinRadius = withDistance.filter((st) => st.distanceKm <= maxKm);
 
-    // If no stations strictly within radius, show the closest 6 stations
     if (withinRadius.length === 0) {
       return withDistance.sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 8);
     }
@@ -113,7 +118,6 @@ export default function MapComponent({
     const darkMatterStyleUrl = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
     const fallbackTomTomStyle = 'https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.25.0/maps/styles/basic-night.json';
 
-    // Start centered on user location if available, otherwise Madurai Smart Grid Operational Center
     const startCenter: [number, number] = userLocation?.coords || [78.1198, 9.9195];
 
     const map = new maplibregl.Map({
@@ -139,7 +143,6 @@ export default function MapComponent({
 
     map.on('load', () => {
       map.resize();
-      // Add traffic flow layer
       try {
         if (!map.getSource('tomtom-traffic-flow')) {
           map.addSource('tomtom-traffic-flow', {
@@ -177,10 +180,10 @@ export default function MapComponent({
     };
   }, []);
 
-  // 4. Auto-Focus Camera on User's Location & Nearby Stations on First Load
+  // 4. Center Camera on User Location
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !userLocation || !userLocation.coords || isInitialLocationFitDone) return;
+    if (!map || !userLocation || !userLocation.coords) return;
 
     if (filteredStations.length > 0) {
       const bounds = new maplibregl.LngLatBounds();
@@ -192,27 +195,24 @@ export default function MapComponent({
       });
 
       map.fitBounds(bounds, {
-        padding: { top: 80, bottom: 80, left: 60, right: 60 },
+        padding: { top: 90, bottom: 90, left: 70, right: 70 },
         maxZoom: 14.5,
-        duration: 1200,
+        duration: 900,
       });
-      setIsInitialLocationFitDone(true);
     } else {
       map.flyTo({
         center: userLocation.coords,
         zoom: 13.8,
         duration: 900,
       });
-      setIsInitialLocationFitDone(true);
     }
-  }, [userLocation, filteredStations, isInitialLocationFitDone]);
+  }, [userLocation]);
 
-  // 5. Render Grounded EV Station Markers (Strictly Nearby)
+  // 5. Render Grounded EV Station Markers
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    // Clear previous markers
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
@@ -320,7 +320,6 @@ export default function MapComponent({
 
     userEl.innerHTML = `
       <div style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
-        <!-- Pulsing Radar Wave -->
         <div style="
           position: absolute;
           width: 40px;
@@ -329,7 +328,6 @@ export default function MapComponent({
           background: rgba(14, 165, 233, 0.35);
           animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
         "></div>
-        <!-- Outer Beacon Disk -->
         <div style="
           position: absolute;
           width: 24px;
@@ -342,7 +340,6 @@ export default function MapComponent({
           align-items: center;
           justify-content: center;
         ">
-          <!-- Inner Core Dot -->
           <div style="
             width: 8px;
             height: 8px;
@@ -358,68 +355,38 @@ export default function MapComponent({
       .addTo(map);
   }, [userLocation]);
 
-  // 7. Direct Route Polyline to Selected Station
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
+  // Handle explicit GPS Permission Request
+  const handleRequestExactGps = async () => {
+    setIsGpsLoading(true);
+    setGpsErrorMsg(null);
+    try {
+      const loc = await requestExactGpsLocation();
+      setUserLocation(loc);
+      setIsLocationModalOpen(false);
 
-    const selected = filteredStations.find((s) => s.id === selectedStationId);
-
-    // Remove existing route layer & source
-    if (map.getLayer('direct-hub-route-line')) {
-      map.removeLayer('direct-hub-route-line');
-    }
-    if (map.getSource('direct-hub-route')) {
-      map.removeSource('direct-hub-route');
-    }
-
-    if (selected && selected.coords && userLocation?.coords) {
-      const geojson: any = {
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: [userLocation.coords, selected.coords],
-        },
-      };
-
-      try {
-        map.addSource('direct-hub-route', {
-          type: 'geojson',
-          data: geojson,
-        });
-
-        map.addLayer({
-          id: 'direct-hub-route-line',
-          type: 'line',
-          source: 'direct-hub-route',
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round',
-          },
-          paint: {
-            'line-color': '#38bdf8',
-            'line-width': 3.5,
-            'line-dasharray': [2, 2],
-            'line-opacity': 0.85,
-          },
-        });
-      } catch (err) {
-        console.warn('Direct route polyline notice:', err);
-      }
-
-      // Fly to enclose both user location and station
-      const bounds = new maplibregl.LngLatBounds();
-      bounds.extend(userLocation.coords);
-      bounds.extend(selected.coords);
-      map.fitBounds(bounds, {
-        padding: { top: 90, bottom: 90, left: 80, right: 80 },
-        maxZoom: 15,
-        duration: 900,
+      // Scrape live TomTom stations around newly acquired exact GPS coordinates
+      scrapeLiveTomTomEVStations(loc.coords, 35000).then((live) => {
+        if (live && live.length > 0) setNearbyStations(live as any);
       });
+    } catch (err: any) {
+      setGpsErrorMsg(err?.message || 'Location permission denied or GPS unavailable');
+    } finally {
+      setIsGpsLoading(false);
     }
-  }, [selectedStationId, filteredStations, userLocation]);
+  };
 
-  // Handle center on user location
+  // Handle manual hub / city selection
+  const handleSelectMunicipalHub = (hub: typeof POPULAR_MUNICIPAL_HUBS[0]) => {
+    const loc = setUserManualLocation(hub.coords, hub.city, hub.state);
+    setUserLocation(loc);
+    setIsLocationModalOpen(false);
+
+    // Scrape live stations around selected hub
+    scrapeLiveTomTomEVStations(hub.coords, 35000).then((live) => {
+      if (live && live.length > 0) setNearbyStations(live as any);
+    });
+  };
+
   const handleCenterOnUser = () => {
     if (userLocation && mapRef.current) {
       mapRef.current.flyTo({
@@ -427,19 +394,6 @@ export default function MapComponent({
         zoom: 14.5,
         pitch: 30,
         duration: 900,
-      });
-    }
-  };
-
-  // Handle radius change
-  const handleRadiusChange = (radius: ProximityRadius) => {
-    setActiveRadius(radius);
-    if (userLocation && mapRef.current) {
-      const targetZoom = radius === '10' ? 14.2 : radius === '25' ? 13.2 : radius === '50' ? 11.8 : 8;
-      mapRef.current.flyTo({
-        center: userLocation.coords,
-        zoom: targetZoom,
-        duration: 800,
       });
     }
   };
@@ -457,7 +411,7 @@ export default function MapComponent({
             <span>🎯</span> Nearby:
           </span>
           <button
-            onClick={() => handleRadiusChange('10')}
+            onClick={() => setActiveRadius('10')}
             className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
               activeRadius === '10'
                 ? 'bg-cyan-500 text-slate-950 shadow-md'
@@ -467,7 +421,7 @@ export default function MapComponent({
             10 km
           </button>
           <button
-            onClick={() => handleRadiusChange('25')}
+            onClick={() => setActiveRadius('25')}
             className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
               activeRadius === '25'
                 ? 'bg-cyan-500 text-slate-950 shadow-md'
@@ -477,7 +431,7 @@ export default function MapComponent({
             25 km (Default)
           </button>
           <button
-            onClick={() => handleRadiusChange('50')}
+            onClick={() => setActiveRadius('50')}
             className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
               activeRadius === '50'
                 ? 'bg-cyan-500 text-slate-950 shadow-md'
@@ -487,7 +441,7 @@ export default function MapComponent({
             50 km
           </button>
           <button
-            onClick={() => handleRadiusChange('all')}
+            onClick={() => setActiveRadius('all')}
             className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
               activeRadius === 'all'
                 ? 'bg-cyan-500 text-slate-950 shadow-md'
@@ -498,24 +452,27 @@ export default function MapComponent({
           </button>
         </div>
 
-        {/* Right: User Live Location Indicator & Center Button */}
+        {/* Right: User Live Location Indicator & Change Location Button */}
         <div className="flex items-center gap-2 pointer-events-auto">
           {userLocation ? (
             <button
-              onClick={handleCenterOnUser}
-              title="Center view on your live location"
+              onClick={() => setIsLocationModalOpen(true)}
+              title="Click to set exact city / trigger GPS permission"
               className="px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 bg-slate-900/95 text-cyan-300 border border-cyan-500/50 hover:bg-slate-800 shadow-xl backdrop-blur-xl transition-all active:scale-95"
             >
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
               <span>📍 {userLocation.city || 'Your Location'}</span>
-              <span className="text-[10px] text-cyan-200/70 font-mono">
-                [{userLocation.coords[0].toFixed(2)}, {userLocation.coords[1].toFixed(2)}]
+              <span className="text-[10px] bg-cyan-500/20 text-cyan-200 px-1.5 py-0.5 rounded font-mono">
+                {userLocation.source === 'gps' ? '🛰️ High-Accuracy GPS' : 'Change City ▾'}
               </span>
             </button>
           ) : (
-            <div className="bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold text-slate-400">
-              Locating...
-            </div>
+            <button
+              onClick={() => setIsLocationModalOpen(true)}
+              className="bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold text-slate-400 hover:text-white"
+            >
+              Set Location ▾
+            </button>
           )}
 
           <div className="bg-slate-900/90 backdrop-blur-xl px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold text-slate-200 shadow-lg flex items-center gap-1.5">
@@ -524,6 +481,77 @@ export default function MapComponent({
           </div>
         </div>
       </div>
+
+      {/* Interactive Location Precision & Permission Selector Modal */}
+      {isLocationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 text-slate-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📍</span>
+                <h3 className="text-base font-black text-white">Set Your Exact Location</h3>
+              </div>
+              <button
+                onClick={() => setIsLocationModalOpen(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Ensure high-precision EV station proximity matching by granting live GPS access or picking your active municipal region.
+            </p>
+
+            {/* Request Live Device GPS Button */}
+            <button
+              onClick={handleRequestExactGps}
+              disabled={isGpsLoading}
+              className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all active:scale-98 disabled:opacity-50"
+            >
+              <span>{isGpsLoading ? '🛰️ Requesting Satellite GPS...' : '🛰️ Request Live Device GPS Lock'}</span>
+            </button>
+
+            {gpsErrorMsg && (
+              <div className="text-[11px] text-amber-300 bg-amber-950/60 border border-amber-500/40 p-2.5 rounded-xl">
+                ⚠️ {gpsErrorMsg}. Please select a city below:
+              </div>
+            )}
+
+            {/* Quick Pick Municipal Regions */}
+            <div>
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                Quick Select Active Hub
+              </h4>
+              <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                {POPULAR_MUNICIPAL_HUBS.map((hub) => (
+                  <button
+                    key={hub.name}
+                    onClick={() => handleSelectMunicipalHub(hub)}
+                    className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-750 border border-slate-700 text-left transition-all active:scale-98 group"
+                  >
+                    <div className="text-xs font-bold text-white group-hover:text-cyan-300 truncate">
+                      {hub.name}
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">
+                      {hub.city}, {hub.state}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex justify-end">
+              <button
+                onClick={() => setIsLocationModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Glassmorphic Hover Telemetry Tooltip */}
       {hoveredStation && hoverPos && (

@@ -74,7 +74,24 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(createWindow);
+  app.whenReady().then(() => {
+    // Automatically grant geolocation and media permissions
+    const { session } = require('electron');
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      if (permission === 'geolocation' || permission === 'media' || permission === 'notifications') {
+        return callback(true);
+      }
+      callback(false);
+    });
+    session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+      if (permission === 'geolocation' || permission === 'media') {
+        return true;
+      }
+      return false;
+    });
+
+    createWindow();
+  });
 }
 
 app.on('window-all-closed', () => {
