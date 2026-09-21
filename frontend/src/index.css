@@ -1,0 +1,164 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Zeus OS — Clean-Tech Nordic Design Tokens ── */
+
+:root {
+  color-scheme: light;
+  --zeus-canvas:    #F8FAFC;
+  --zeus-surface:   #FFFFFF;
+  --zeus-panel:     #F1F5F9;
+  --zeus-border:    #E2E8F0;
+  --zeus-muted:     #94A3B8;
+  --zeus-text:      #334155;
+  --zeus-heading:   #0F172A;
+  --zeus-accent:    #0891B2;
+  --zeus-optimal:   #10B981;
+  --zeus-moderate:  #F59E0B;
+  --zeus-critical:  #F43F5E;
+}
+
+/* ── Base ── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--zeus-canvas);
+  color: var(--zeus-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+}
+
+/* ── Scrollbar — Minimal Nordic ── */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 100px;
+}
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ── Glassmorphic Utility Classes ── */
+
+@layer components {
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-xl border border-zeus-border rounded-2xl shadow-glass;
+  }
+
+  .glass-panel-solid {
+    @apply bg-white border border-zeus-border rounded-2xl shadow-card;
+  }
+
+  .zeus-card {
+    @apply bg-white rounded-2xl border border-slate-200 shadow-card p-5
+           transition-shadow duration-200 hover:shadow-lift;
+  }
+
+  .zeus-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px]
+           font-bold uppercase tracking-wider border;
+  }
+
+  .zeus-badge-optimal {
+    @apply zeus-badge bg-emerald-50 text-emerald-600 border-emerald-200;
+  }
+
+  .zeus-badge-moderate {
+    @apply zeus-badge bg-amber-50 text-amber-600 border-amber-200;
+  }
+
+  .zeus-badge-critical {
+    @apply zeus-badge bg-rose-50 text-rose-600 border-rose-200;
+  }
+
+  .zeus-btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2
+           rounded-xl text-sm font-semibold transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .zeus-btn-primary {
+    @apply zeus-btn bg-zeus-accent text-white hover:bg-cyan-700
+           focus:ring-cyan-500 shadow-sm active:scale-[0.98];
+  }
+
+  .zeus-btn-danger {
+    @apply zeus-btn bg-rose-500 text-white hover:bg-rose-600
+           focus:ring-rose-500 shadow-sm active:scale-[0.98];
+  }
+
+  .zeus-btn-ghost {
+    @apply zeus-btn bg-transparent text-slate-600 hover:bg-slate-100
+           focus:ring-slate-400 active:scale-[0.98];
+  }
+
+  .zeus-metric-card {
+    @apply flex flex-col gap-1 p-4 rounded-xl bg-white border border-slate-200
+           shadow-card transition-shadow hover:shadow-lift;
+  }
+
+  .zeus-metric-value {
+    @apply text-2xl font-extrabold text-zeus-heading font-mono tracking-tight;
+  }
+
+  .zeus-metric-label {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-slate-400;
+  }
+}
+
+/* ── MapLibre Overrides for Nordic theme ── */
+
+.maplibregl-popup-content {
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 16px !important;
+  padding: 16px !important;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08) !important;
+  color: #334155 !important;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+.maplibregl-popup-close-button {
+  color: #94A3B8 !important;
+  font-size: 18px !important;
+  padding: 4px 8px !important;
+}
+
+.maplibregl-popup-close-button:hover {
+  color: #0F172A !important;
+  background: #F1F5F9 !important;
+  border-radius: 8px !important;
+}
+
+/* ── Animations ── */
+
+@keyframes zeus-pulse-ring {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50%      { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes zeus-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-zeus-fade-in {
+  animation: zeus-fade-in 0.35s ease-out;
+}
