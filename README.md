@@ -18,6 +18,7 @@
 </p>
 
 <p align="center">
+  <a href="#-quick-download-links--binaries"><strong>Download App & Exe</strong></a> •
   <a href="#overview">Overview</a> •
   <a href="#system-goals">System Goals</a> •
   <a href="#key-capabilities">Capabilities</a> •
@@ -29,6 +30,13 @@
 
 <p align="center">
 
+[![Download Android APK](https://img.shields.io/badge/📱_Download-ZEUS.apk_(Android)-10b981?style=for-the-badge&logo=android)](./ZEUS.apk)
+[![Download Windows Portable Exe](https://img.shields.io/badge/💻_Download-Zeus_Admin_Portable_(.exe)-3b82f6?style=for-the-badge&logo=windows)](./Zeus-Admin-Portable.exe)
+
+</p>
+
+<p align="center">
+
 [![Android](https://img.shields.io/badge/Android-8.0%2B-34A853?style=flat-square&logo=android&logoColor=white)](./ZEUS.apk)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?style=flat-square&logo=windows&logoColor=white)](./Zeus-Admin-Portable.exe)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
@@ -36,11 +44,22 @@
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%7C%20RTDB-FFCA28?style=flat-square&logo=firebase&logoColor=black)](https://firebase.google.com/)
 [![TomTom](https://img.shields.io/badge/TomTom-Traffic%20%26%20Maps-DF2020?style=flat-square&logo=tomtom&logoColor=white)](https://developer.tomtom.com/)
 [![Deck.gl](https://img.shields.io/badge/Deck.gl-9.x-00B4D8?style=flat-square)](https://deck.gl/)
-[![Gemini](https://img.shields.io/badge/Google-Gemini-8E75B2?style=flat-square&logo=google&logoColor=white)](https://ai.google.dev/)
+[![Gemini](https://img.shields.io/badge/Google-Gemini_2.5_Flash-8E75B2?style=flat-square&logo=google&logoColor=white)](https://ai.google.dev/)
 
 </p>
 
 </div>
+
+---
+
+## 🚀 Quick Download Links & Binaries
+
+Get the standalone production-ready builds for mobile and desktop:
+
+| Platform | Direct Download Link | Size | Target Audience | Description |
+|---|---|---|---|---|
+| 📱 **Android Mobile** | [📥 **Download `ZEUS.apk`**](./ZEUS.apk) | `5.75 MB` | EV Drivers, Scooter Pilots & Fleets | In-cabin navigation with live GPS, TomTom real-time arterial traffic, Gemini AI voice copilot, and prepaid UPI slot booking. |
+| 💻 **Windows Desktop** | [📥 **Download `Zeus-Admin-Portable.exe`**](./Zeus-Admin-Portable.exe) | `93.5 MB` | Municipal Grid Authorities & Operators | Zero-install portable command center with 3D digital twin, AI voice executive reports, telemetry seeding, and dispute management. |
 
 ---
 
